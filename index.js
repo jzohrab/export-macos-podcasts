@@ -1,4 +1,4 @@
-const { promises: fs, existsSync, mkdirSync } = require("fs");
+const { promises: fs, existsSync, mkdirSync, copyFileSync } = require("fs");
 const { promisify } = require("util");
 const sqlite3 = require("sqlite3").verbose();
 const mm = require("music-metadata");
@@ -24,6 +24,12 @@ const argv = yargs
         alias: 'p',
         description: 'File substring patterns to match',
         type: 'string'
+      })
+      .option('updateutime', {
+        alias: 'u',
+        description: 'Update the utime of the downloaded files',
+        type: 'boolean',
+        default: false
       })
       .option('nospaces', {
         description: 'Replace filename spaces with underscores',
@@ -177,8 +183,8 @@ function filterPodcasts(podcasts, filepatterns = []) {
 
 
 async function exportSingle(podcast, newPath) {
-  await fs.copyFile(podcast.path, newPath);
-  if (podcast.date) {
+  copyFileSync(podcast.path, newPath);
+  if (podcast.date && argv.updateutime) {
     const d = new Date(podcast.date);
     await fs.utimes(newPath, d, d);
   }
@@ -191,7 +197,28 @@ async function exportPodcasts(podcastsDBData, filepatterns = []) {
   const podcasts = await Promise.all(podcastMP3Files.map((fileName) => {
     return buildPodcastDict(fileName, cacheFilesPath, podcastsDBData);
   }));
-  const filteredPodcasts = filterPodcasts(podcasts, filepatterns);
+  let filteredPodcasts = filterPodcasts(podcasts, filepatterns);
+
+  // Weirdly, there are some podcasts that are duplicates ...  i.e.,
+  // if you uncomment the below code, it prints some duplicate names,
+  // in my case at least.
+  /*
+    const allNames = filteredPodcasts.map(p => p.exportFileName);
+    console.log(`have ${allNames.length} names`);
+    const uniqueNames = Array.from(new Set(allNames));
+    console.log(`have ${uniqueNames.length} names`);
+    const dups = allNames.filter((e, i, a) => a.indexOf(e) !== i);
+    console.log(`duplicates! ${dups}`);
+    process.exit(0);
+  */
+  // Since this causes some strange messages to appear during output
+  // to a new output directory, delete the dups by keying on filename.
+  const temp = {}
+  // console.log('removing dups');
+  filteredPodcasts.forEach(p => temp[p.exportFileName] = p);
+  filteredPodcasts = Object.values(temp);
+  // console.log('done dups');
+
   if (filepatterns.length > 0) {
     console.log(`Exporting ${filteredPodcasts.length} of ${podcasts.length}`);
   }
@@ -207,7 +234,11 @@ async function exportPodcasts(podcastsDBData, filepatterns = []) {
     return joinPath([outputDir, p.podcastName]);
   });
   const uniqueDirs = Array.from(new Set(allDirs));
+  // console.log(`Making ${uniqueDirs.length} directories ...`);
   uniqueDirs.forEach(d => mkdirSync(d, { recursive: true }));
+  // console.log(`Done making ${uniqueDirs.length} directories.`);
+
+  let skipped = 0;
 
   // Actual file export.
   await Promise.all(
@@ -216,16 +247,20 @@ async function exportPodcasts(podcastsDBData, filepatterns = []) {
       const newPath = joinPath(parts);
       const logName = joinPath([p.podcastName, p.exportFileName]);
       if (!existsSync(newPath)) {
-        await exportSingle(p, newPath);
         console.log(`${p.fileName} -> ${logName}`);
+        await exportSingle(p, newPath);
       }
       else {
+        skipped += 1;  // Might not work w/ promises, but not concerned.
         console.log(`Already have ${logName}, skipping`);
       }
     })
   );
 
-  console.log(`\n\nSuccessful Export to '${outputDir}' folder!`);
+  console.log(`\n\nExported ${filteredPodcasts.length} podcasts to '${outputDir}'`);
+  if (skipped > 0) {
+    console.log(`(skipped ${skipped}, already present)`);
+  }
   exec(`open ${outputDir}`);
 }
 
@@ -234,8 +269,12 @@ async function main(filepatterns = []) {
   await exportPodcasts(dbPodcastData, filepatterns);
 }
 
-// User might specify one pattern, in which case argv.pattern is a
-// string, or multiple, in which case it's an array.
-patterns = [ argv.pattern ].flat()
+// Default: return all files.
+let patterns = []
+if (argv.pattern) {
+  // User might specify one pattern, in which case argv.pattern is a
+  // string, or multiple, in which case it's an array.
+  patterns = [ argv.pattern ].flat();
+}
 
 main(patterns);
