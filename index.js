@@ -25,20 +25,10 @@ const argv = yargs
         description: 'File substring patterns to match',
         type: 'string'
       })
-      .option('silent', {
-        description: 'Suppress extra output',
-        type: 'boolean',
-        default: false
-      })
       .option('nospaces', {
         description: 'Replace filename spaces with underscores',
         type: 'boolean',
-        default: true
-      })
-      .option('report', {
-        description: 'Provide report at end of files downloaded',
-        type: 'boolean',
-        default: true
+        default: false
       })
       .help()
       .alias('help', 'h').argv;
@@ -140,6 +130,15 @@ original error: ${e}`);
 }
 
 
+function handleSpaces(s) {
+  ret = s;
+  if (argv.nospaces) {
+    ret = s.replaceAll(' ', '_');
+  }
+  return ret;
+}
+
+
 async function buildPodcastDict(fileName, cacheFilesPath, podcastsDBData) {
   const uuid = fileName.replace(".mp3", "");
   const dbMeta = podcastsDBData.find((m) => m.zuuid === uuid);
@@ -149,15 +148,14 @@ async function buildPodcastDict(fileName, cacheFilesPath, podcastsDBData) {
         ?? uuid; // 3. fallback to unreadable uuid
   const podcastName = dbMeta?.zpodcast.replaceAll('/', '_');
   const exportFileName = sanitize(exportBase.substr(0, fileNameMaxLength));
-  const date = dbMeta?.date
 
   const ret = {
-    podcastName,
-    date,
+    podcastName: handleSpaces(podcastName),
+    date: dbMeta?.date,
     fileName,
     path,
     uuid,
-    exportFileName: `${exportFileName}.mp3`
+    exportFileName: handleSpaces(`${exportFileName}.mp3`)
   };
   return ret;
 }
