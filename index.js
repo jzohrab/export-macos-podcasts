@@ -241,12 +241,12 @@ function addFilePaths(p, outputDir) {
 
 
 async function exportPodcasts(podcastsDBData, filepatterns = []) {
-  let filteredPodcasts = await getPodcastsToExport(podcastsDBData, filepatterns);
+  let podcasts = await getPodcastsToExport(podcastsDBData, filepatterns);
   const outputDir = getOutputDirPath();
-  filteredPodcasts.forEach(p => addFilePaths(p, outputDir));
-  filteredPodcasts = filteredPodcasts.filter(p => !existsSync(p.newPath));
-  if (filteredPodcasts.length > 0) {
-    console.log(`Exporting ${filteredPodcasts.length} podcasts.\n`);
+  podcasts.forEach(p => addFilePaths(p, outputDir));
+  podcasts = podcasts.filter(p => !existsSync(p.newPath));
+  if (podcasts.length > 0) {
+    console.log(`Exporting ${podcasts.length} podcasts.\n`);
   }
   else {
     console.log('No podcasts to export, quitting.');
@@ -254,21 +254,17 @@ async function exportPodcasts(podcastsDBData, filepatterns = []) {
   }
 
   // Make all necessary directories, directory per podcast.
-  const allDirs = filteredPodcasts.map(p => path.dirname(p.newPath));
+  const allDirs = podcasts.map(p => path.dirname(p.newPath));
   const uniqueDirs = Array.from(new Set(allDirs));
   uniqueDirs.forEach(d => mkdirSync(d, { recursive: true }));
 
   // Actual file export.
-  await Promise.all(
-    filteredPodcasts.map(async (p) => {
-      if (!existsSync(p.newPath)) {
-        console.log(p.logName);
-        await exportSingle(p);
-      }
-    })
-  );
+  await Promise.all(podcasts.map(async (p) => {
+    console.log(p.logName);
+    await exportSingle(p);
+  }));
 
-  console.log(`\nExported ${filteredPodcasts.length} podcasts to '${outputDir}'`);
+  console.log(`\nExported ${podcasts.length} podcasts to '${outputDir}'`);
 
   if (argv.openfinder) {
     exec(`open ${outputDir}`);
