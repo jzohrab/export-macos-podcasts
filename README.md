@@ -18,7 +18,7 @@ Options:
   -d, --datesubdir  Add YYYY.MM.DD subdirectory to output dir
                                                        [boolean] [default: true]
   -p, --pattern     File substring patterns to match                    [string]
-      --no-spaces    Replace filename spaces with underscores
+      --nospaces    Replace filename spaces with underscores
                                                       [boolean] [default: false]
   -h, --help        Show help                                          [boolean]
 ```

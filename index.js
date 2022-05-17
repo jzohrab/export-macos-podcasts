@@ -241,24 +241,22 @@ function addFilePaths(p, outputDir) {
 
 
 async function exportPodcasts(podcastsDBData, filepatterns = []) {
-  const filteredPodcasts = await getPodcastsToExport(podcastsDBData, filepatterns);
-  if (filepatterns.length > 0) {
-    console.log(`Exporting ${filteredPodcasts.length} podcasts.`);
+  let filteredPodcasts = await getPodcastsToExport(podcastsDBData, filepatterns);
+  const outputDir = getOutputDirPath();
+  filteredPodcasts.forEach(p => addFilePaths(p, outputDir));
+  filteredPodcasts = filteredPodcasts.filter(p => !existsSync(p.newPath));
+  if (filteredPodcasts.length > 0) {
+    console.log(`Exporting ${filteredPodcasts.length} podcasts.\n`);
   }
   else {
     console.log('No podcasts to export, quitting.');
     return;
   }
 
-  const outputDir = getOutputDirPath();
-  filteredPodcasts.forEach(p => addFilePaths(p, outputDir));
-
   // Make all necessary directories, directory per podcast.
   const allDirs = filteredPodcasts.map(p => path.dirname(p.newPath));
   const uniqueDirs = Array.from(new Set(allDirs));
   uniqueDirs.forEach(d => mkdirSync(d, { recursive: true }));
-
-  let skipped = 0;
 
   // Actual file export.
   await Promise.all(
@@ -267,18 +265,14 @@ async function exportPodcasts(podcastsDBData, filepatterns = []) {
         console.log(p.logName);
         await exportSingle(p);
       }
-      else {
-        skipped += 1;  // Might not work w/ promises, but not concerned.
-        // console.log(`Already have ${logName}, skipping`);
-      }
     })
   );
 
-  console.log(`\n\nExported ${filteredPodcasts.length} podcasts to '${outputDir}'`);
-  if (skipped > 0) {
-    console.log(`(skipped ${skipped}, already present)`);
+  console.log(`\nExported ${filteredPodcasts.length} podcasts to '${outputDir}'`);
+
+  if (argv.openfinder) {
+    exec(`open ${outputDir}`);
   }
-  exec(`open ${outputDir}`);
 }
 
 async function main(filepatterns = []) {
