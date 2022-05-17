@@ -1,5 +1,6 @@
 const { promises: fs, existsSync, mkdirSync, copyFileSync } = require("fs");
 const { promisify } = require("util");
+const path = require('path');
 const sqlite3 = require("sqlite3").verbose();
 const mm = require("music-metadata");
 const { exec } = require("child_process");
@@ -182,8 +183,8 @@ function filterPodcasts(podcasts, filepatterns = []) {
 }
 
 
-async function exportSingle(podcast, newPath) {
-  copyFileSync(podcast.path, newPath);
+async function exportSingle(podcast) {
+  copyFileSync(podcast.path, podcast.newPath);
   if (podcast.date && argv.updateutime) {
     const d = new Date(podcast.date);
     await fs.utimes(newPath, d, d);
@@ -223,6 +224,17 @@ async function getPodcastsToExport(podcastsDBData, filepatterns = []) {
 }
 
 
+function addFilePaths(p, outputDir) {
+  function joinPath(parts) {
+    return parts.filter((s) => s).join('/');
+  }
+
+  const parts = [outputDir, p.podcastName, p.exportFileName];
+  p.newPath = joinPath(parts);
+  p.logName = joinPath([p.podcastName, p.exportFileName]);
+}
+
+
 async function exportPodcasts(podcastsDBData, filepatterns = []) {
   const filteredPodcasts = await getPodcastsToExport(podcastsDBData, filepatterns);
   if (filepatterns.length > 0) {
@@ -233,32 +245,22 @@ async function exportPodcasts(podcastsDBData, filepatterns = []) {
     return;
   }
 
-  function joinPath(parts) {
-    return parts.filter((s) => s).join('/');
-  }
-
-  // Make all necessary directories.  Each podcast is in its own
-  // subdir.
   const outputDir = getOutputDirPath();
-  const allDirs = filteredPodcasts.map(p => {
-    return joinPath([outputDir, p.podcastName]);
-  });
+  filteredPodcasts.forEach(p => addFilePaths(p, outputDir));
+
+  // Make all necessary directories, directory per podcast.
+  const allDirs = filteredPodcasts.map(p => path.dirname(p.newPath));
   const uniqueDirs = Array.from(new Set(allDirs));
-  // console.log(`Making ${uniqueDirs.length} directories ...`);
   uniqueDirs.forEach(d => mkdirSync(d, { recursive: true }));
-  // console.log(`Done making ${uniqueDirs.length} directories.`);
 
   let skipped = 0;
 
   // Actual file export.
   await Promise.all(
     filteredPodcasts.map(async (p) => {
-      const parts = [outputDir, p.podcastName, p.exportFileName];
-      const newPath = joinPath(parts);
-      const logName = joinPath([p.podcastName, p.exportFileName]);
-      if (!existsSync(newPath)) {
-        console.log(`${logName}`);
-        await exportSingle(p, newPath);
+      if (!existsSync(p.newPath)) {
+        console.log(p.logName);
+        await exportSingle(p);
       }
       else {
         skipped += 1;  // Might not work w/ promises, but not concerned.
