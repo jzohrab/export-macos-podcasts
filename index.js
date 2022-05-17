@@ -19,7 +19,7 @@ const argv = yargs
         alias: 'd',
         description: 'Add YYYY.MM.DD subdirectory to output dir',
         type: 'boolean',
-        default: true
+        default: false
       })
       .option('pattern', {
         alias: 'p',
@@ -32,8 +32,13 @@ const argv = yargs
         type: 'boolean',
         default: false
       })
-      .option('no-spaces', {
+      .option('nospaces', {
         description: 'Replace filename spaces with underscores',
+        type: 'boolean',
+        default: true
+      })
+      .option('openfinder', {
+        description: 'Open finder window when done',
         type: 'boolean',
         default: false
       })
