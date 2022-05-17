@@ -31,7 +31,7 @@ const argv = yargs
         type: 'boolean',
         default: false
       })
-      .option('nospaces', {
+      .option('no-spaces', {
         description: 'Replace filename spaces with underscores',
         type: 'boolean',
         default: false
@@ -191,7 +191,7 @@ async function exportSingle(podcast, newPath) {
 }
 
 
-async function exportPodcasts(podcastsDBData, filepatterns = []) {
+async function getPodcastsToExport(podcastsDBData, filepatterns = []) {
   const cacheFilesPath = await getPodcastsCacheFilesPath();
   const podcastMP3Files = await getPodcastsCacheMP3Files(cacheFilesPath);
   const podcasts = await Promise.all(podcastMP3Files.map((fileName) => {
@@ -219,8 +219,18 @@ async function exportPodcasts(podcastsDBData, filepatterns = []) {
   filteredPodcasts = Object.values(temp);
   // console.log('done dups');
 
+  return filteredPodcasts;
+}
+
+
+async function exportPodcasts(podcastsDBData, filepatterns = []) {
+  const filteredPodcasts = await getPodcastsToExport(podcastsDBData, filepatterns);
   if (filepatterns.length > 0) {
-    console.log(`Exporting ${filteredPodcasts.length} of ${podcasts.length}`);
+    console.log(`Exporting ${filteredPodcasts.length} podcasts.`);
+  }
+  else {
+    console.log('No podcasts to export, quitting.');
+    return;
   }
 
   function joinPath(parts) {
@@ -247,12 +257,12 @@ async function exportPodcasts(podcastsDBData, filepatterns = []) {
       const newPath = joinPath(parts);
       const logName = joinPath([p.podcastName, p.exportFileName]);
       if (!existsSync(newPath)) {
-        console.log(`${p.fileName} -> ${logName}`);
+        console.log(`${logName}`);
         await exportSingle(p, newPath);
       }
       else {
         skipped += 1;  // Might not work w/ promises, but not concerned.
-        console.log(`Already have ${logName}, skipping`);
+        // console.log(`Already have ${logName}, skipping`);
       }
     })
   );
