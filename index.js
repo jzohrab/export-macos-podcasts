@@ -16,7 +16,6 @@ const argv = yargs
         default: `${process.env.HOME}/Downloads/PodcastsExport`
       })
       .option('datesubdir', {
-        alias: 'd',
         description: 'Add YYYY.MM.DD subdirectory to output dir',
         type: 'boolean',
         default: false
@@ -24,6 +23,11 @@ const argv = yargs
       .option('pattern', {
         alias: 'p',
         description: 'File substring patterns to match',
+        type: 'string'
+      })
+      .option('after', {
+        alias: 'a',
+        description: 'Podcasts after date (yyyy-mm-dd)',
         type: 'string'
       })
       .option('updateutime', {
@@ -39,6 +43,11 @@ const argv = yargs
       })
       .option('openfinder', {
         description: 'Open finder window when done',
+        type: 'boolean',
+        default: false
+      })
+      .option('dryrun', {
+        description: 'Dry run only, no export',
         type: 'boolean',
         default: false
       })
@@ -205,6 +214,10 @@ async function getPodcastsToExport(podcastsDBData, filepatterns = []) {
   }));
   let filteredPodcasts = filterPodcasts(podcasts, filepatterns);
 
+  filteredPodcasts = filteredPodcasts.filter((p) => {
+    return !argv.after || (p.date > argv.after);
+  });
+
   // Weirdly, there are some podcasts that are duplicates ...  i.e.,
   // if you uncomment the below code, it prints some duplicate names,
   // in my case at least.
@@ -250,6 +263,15 @@ async function exportPodcasts(podcastsDBData, filepatterns = []) {
   }
   else {
     console.log('No podcasts to export, quitting.');
+    return;
+  }
+
+  if (argv.dryrun) {
+    console.log('Dry run, not exporting.\n');
+    output = podcasts.map(p => p.logName);
+    output.sort();
+    output.forEach(p => console.log(p));
+    console.log(`\n${podcasts.length} files.\n`);
     return;
   }
 
